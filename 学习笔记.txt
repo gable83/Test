@@ -1,0 +1,621 @@
+服务端事件处理顺序如下： 
+UpStream.ChannelState.OPEN—–>DownStream.ChannelState.BOUND(需要绑定) 
+——–>UpStream.ChannelState.BOUND(已经绑定)——>DownStream.CONNECTED(需要连接)——->UpStream.CONNECTED(连接成功) 
+-------------------------------------------------
+连接Redis服务器命令:
+连接：redis-cli -h machine(ip) -p port -n db
+
+redis-cli [OPTIONS] [cmd [arg [arg ...]]]
+-h <主机ip>，默认是127.0.0.1
+-p <端口>，默认是6379
+-a <密码>，如果redis加锁，需要传递密码
+--help，显示帮助信息
+--------------------------------------------------
+yum -y install 包名（支持*） ：自动选择y，全自动
+yum install 包名（支持*） ：手动选择y or n
+yum remove 包名（不支持*）
+rpm -ivh 包名（支持*）：安装rpm包
+rpm -e 包名（不支持*）：卸载rpm包
+--------------------------------------------------
+Linux CPU高占用:
+top -H -p pid
+gdb icdn pid  #会停止线程执行,慎用!!
+
+CPU高占用(jstack):
+ps -mp pid -o THREAD,tid,time  或者 top -H -p pid
+
+printf "%x\n" tid
+
+jstack pid |grep tid -A 30
+
+jmap命令有下面几种常用的用法：
+
+?jmap [pid]
+
+?jmap -histo:live [pid] >a.log
+
+?jmap -dump:live,format=b,file=xxx.xxx [pid]
+
+
+----------------------------------
+内存分析命令:
+ps -mp 35665 -o THREAD,tid,time
+printf "%x\n" 8402
+jstack 35665 |grep 0x32fe -A 30
+
+jmap -histo:live 28655 |head -n 100
+
+jmap -dump:live,format=b,file=heapt0521.bin 14153
+------------------------------------------------------------
+22.431: [GC [PSYoungGen: 1151K->638K(36352K)] 9659K->9146K(80384K), 0.0032716 secs] [Times: user=0.03 sys=0.00, real=0.00 secs] 
+22.435: [Full GC [PSYoungGen: 638K->0K(36352K)] [ParOldGen: 8507K->9082K(44032K)] 9146K->9082K(80384K) [PSPermGen: 14392K->14392K(21504K)], 0.0547773 secs] [Times: user=0.08 sys=0.00, real=0.06 secs]
+第一条信息:
+GC说明是minor GC（年轻代GC）。
+PSYoungGen表示收集使用的收集器是多线程垃圾收集器Parallel Scavenge。
+1151K->638K(36352K)中，1151K表示收集前年轻代占用的内存，638K表示收集后年轻代占用的内存。由于年轻代分为Eden和两个Suvivor，minor收集后Eden为空，所以该值也是Survivor的占用量。括号中的36352K是年轻代的大小。
+9659K->9146K(80384K)中，9659K表示收集前整个堆占用的内存，9146K表示收集后整个堆占用的内存。括号里的80384K是Java堆的总量，可以算出老年代的大小是44032K（80384K-36352K）。
+0.0032716是整次GC的暂停时间。
+[Times: user=0.03 sys=0.00, real=0.00 secs]里，user是垃圾收集器执行非操作系统调用指令所耗费的CPU时间，sys是垃圾收集器执行操作系统调用所耗费的CPU时间, real表示完成GC的实际时间。
+GC之后，年轻代减少了513K（1151K-638K），老年代占用的空间则没有变化（(9146K-638K)-(9659K-1151K)），这说明年轻代里的对象都被回收了，没有晋升到老年代中。
+
+第二条信息：
+Full GC说明是full GC，是对整个堆进行GC，包括年轻代、老年代和永久代。
+PSYoungGen: 638K->0K(36352K)的含义和第一条信息里的PSYoungGen: 1151K->638K(36352K)一样。
+ParOldGen: 8507K->9082K(44032K)表示老年代收集使用的是多线程垃圾收集器Parallel Old，收集前老年代占用8507K，收集后占用9082K，老年代的大小是44032K。
+PSPermGen: 14392K->14392K(21504K)说明GC前永久代的占用量是14392K，GC后永久代的占用量是14392K，而永久代的大小是21504K。
+
+ 对应的参数列表( > 覆盖日志,  >>附加信息到日志 )
+-verbose:gc   可以辅助输出一些详细的GC信息
+-XX:+PrintGC   输出GC日志
+-XX:+PrintGCDetails   输出GC的详细日志
+-XX:+PrintGCTimeStamps   输出GC的时间戳（以基准时间的形式）
+-XX:+PrintGCDateStamps   输出GC的时间戳（以日期的形式，如 2013-05-04T21:53:59.234+0800）(from JDK 6 update 4)
+-XX:+PrintGCApplicationStoppedTime  输出GC造成应用程序暂停的时间。
+-XX:+PrintHeapAtGC  在进行GC的前后打印出堆的信息
+-Xloggc:../logs/gc.log  日志文件的输出路径
+-XX:+PrintGCApplicationConcurrentTime和-XX:+PrintGCApplicationStoppedTime  JVM GC的stop-the-world阶段的开销(Java 7 update 71上使用),不过在GCdetail
+中已经输出GC的暂停时间(如:0.0032716 secs)
+例如:
+-XX:+PrintGCDateStamps -XX:+PrintGCDetails -Xloggc:./gclogs
+
+------------------------------------------------------------
+flume: 分布式日志收集系统
+------------------------------------------------------------
+netty 数据分包、组包、粘包处理机制
+(1)  FrameDecoder
+(2)  FixedLengthFrameDecoder
+(3)  Delimiters   //DelimiterBasedFrameDecoder类的辅助类
+(4)  DelimiterBasedFrameDecoder
+(5)  LengthFieldBasedFrameDecoder
+构造方法LengthFieldBasedFrameDecoder中的参数做以下解释说明:
+	maxFrameLength：解码的帧的最大长度
+	lengthFieldOffset ：长度属性的起始位（偏移位），包中存放有整个大数据包长度的字节，这段字节的其实位置
+	lengthFieldLength：长度属性的长度，即存放整个大数据包长度的字节所占的长度
+	lengthAdjustmen：长度调节值，在总长被定义为包含包头长度时，修正信息长度。initialBytesToStrip：跳过的字节数，根据需要我们跳过lengthFieldLength个字节，
+					 以便接收端直接接受到不含“长度属性”的内容
+	failFast ：为true，当frame长度超过maxFrameLength时立即报TooLongFrameException异常，为false，读取完整个帧再报异常
+(6)  LengthFieldPrepender
+(7)  TooLongFrameException      //定义的数据包超过预定义大小异常类
+(8)  CorruptedFrameException   //定义的数据包损坏异常类
+------------------------------------------------------------
+zkCli.cmd -server IP:port 
+
+zookeeper 的 znode属性:
+czxid
+The zxid of the change that caused this znode to be created.
+mzxid
+The zxid of the change that last modified this znode.
+ctime
+The time in milliseconds from epoch when this znode was created.
+mtime
+The time in milliseconds from epoch when this znode was last modified.
+version
+The number of changes to the data of this znode.
+cversion
+The number of changes to the children of this znode.
+aversion
+The number of changes to the ACL of this znode.
+ephemeralOwner
+The session id of the owner of this znode if the znode is an ephemeral node. If it is not an ephemeral node, it will be zero.
+dataLength
+The length of the data field of this znode.
+numChildren
+The number of children of this znode.
+
+------------------------------------------------------------
+
+1. jmap -heap 837
+2. ps -p 837 -o vsz,rss
+#VSZ是指已分配的线性空间大小，这个大小通常并不等于程序实际用到的内存大小，产生这个的可能性很多，比如内存映射，共享的动态库，或者向系统申请了更多的堆，
+都会扩展线性空间大小，要查看一个进程有哪些内存映射，可以使用 pmap 命令来查看
+#RSZ是Resident Set Size，常驻内存大小，即进程实际占用的物理内存大小 在现在这个例子当中，RSZ和实际堆内存占用差了2.3G，这2.3G的内存组成分别为：
+JVM本身需要的内存，包括其加载的第三方库以及这些库分配的内存
+NIO的DirectBuffer是分配的native memory
+内存映射文件，包括JVM加载的一些JAR和第三方库，以及程序内部用到的。上面 pmap 输出的内容里，有一些静态文件所占用的大小不在Java的heap里，因此作为一个Web
+服务器，赶紧把静态文件从这个Web服务器中人移开吧，放到nginx或者CDN里去吧。
+JIT， JVM会将Class编译成native代码，这些内存也不会少，如果使用了Spring的AOP，CGLIB会生成更多的类，JIT的内存开销也会随之变大，而且Class本身JVM的GC会将
+其放到Perm Generation里去，很难被回收掉，面对这种情况，应该让JVM使用ConcurrentMarkSweep GC，并启用这个GC的相关参数允许将不使用的class从Perm Generation
+中移除， 参数配置： -XX:+UseConcMarkSweepGC -X:+CMSPermGenSweepingEnabled -X:+CMSClassUnloadingEnabled，如果不需要移除而Perm Generation空间不够，可以
+加大一点： -X:PermSize=256M -X:MaxPermSize=512M
+JNI，一些JNI接口调用的native库也会分配一些内存，如果遇到JNI库的内存泄露，可以使用valgrind等内存泄露工具来检测
+线程栈，每个线程都会有自己的栈空间，如果线程一多，这个的开销就很明显了
+jmap/jstack 采样，频繁的采样也会增加内存占用，如果你有服务器健康监控，记得这个频率别太高，否则健康监控变成致病监控了。
+
+3. pmap -x 837
+4. jstat -gcutil 837 1000 20 (每1000毫秒打印pid为837线程的gc信息,打印20次)
+ S0     S1     E      O      P     YGC     YGCT    FGC    FGCT     GCT   
+ 0.00  80.43  24.62  87.44  98.29   7101  119.652    40   19.719  139.371
+ 0.00  80.43  33.14  87.44  98.29   7101  119.652    40   19.719  139.371
+ 
+几个字段分别含义如下：
+S0	年轻代中第一个survivor（幸存区）已使用的占当前容量百分比
+S1	年轻代中第二个survivor（幸存区）已使用的占当前容量百分比
+E	年轻代中Eden（伊甸园）已使用的占当前容量百分比
+O	old代已使用的占当前容量百分比
+P	perm代已使用的占当前容量百分比
+YGC	从应用程序启动到采样时年轻代中gc次数
+YGCT	从应用程序启动到采样时年轻代中gc所用时间(s)
+FGC	从应用程序启动到采样时old代(全gc)gc次数
+FGCT	从应用程序启动到采样时old代(全gc)gc所用时间(s)
+GCT	从应用程序启动到采样时gc用的总时间(s)
+
+因此如果正常情况下jmap输出的内存占用远小于 RSZ，可以不用太担心，除非发生一些严重错误，比如PermGen空间满了导致OutOfMemoryError发生，或者RSZ太高导致引起
+系统公愤被OOM Killer给干掉，就得注意了，该加内存加内存，没钱买内存加交换空间，或者按上面列的组成部分逐一排除。
+这几个内存指标之间的关系是：VSZ >> RSZ >> MaxHeapSize >> Java程序实际使用的堆大小
+----------------------------------------------------------
+TCP/IP: 
+数据链路层：ARP,RARP
+网络层： IP,ICMP,IGMP
+传输层：TCP ,UDP,UGP
+应用层：Telnet,FTP,SMTP,SNMP.
+
+OSI:
+ 物理层：EIA/TIA-232, EIA/TIA-499, V.35, V.24, RJ45, Ethernet, 802.3, 802.5, FDDI, NRZI, NRZ, B8ZS
+数据链路层：Frame Relay, HDLC, PPP, IEEE 802.3/802.2, FDDI, ATM,  IEEE 802.5/802.2
+网络层：IP，IPX，AppleTalk DDP
+传输层：TCP，UDP，SPX
+ 会话层：RPC,SQL,NFS,NetBIOS,names,AppleTalk,ASP,DECnet,SCP
+ 表示层:TIFF,GIF,JPEG,PICT,ASCII,EBCDIC,encryption,MPEG,MIDI,HTML
+应用层：FTP,WWW,Telnet,NFS,SMTP,Gateway,SNMP
+
+--------------------------------------------------
+yum -y install 包名（支持*） ：自动选择y，全自动
+yum install 包名（支持*） ：手动选择y or n
+yum remove 包名（不支持*）
+rpm -ivh 包名（支持*）：安装rpm包
+rpm -e 包名（不支持*）：卸载rpm包
+
+----------------------------------------------------------
+线程堆栈适合分析如下问题:
+? 系统无缘无故CPU过高。
+? 系统挂起， 无响应。
+? 系统运行越来越慢。
+? 性能瓶颈 （如无法充分利用CPU等）
+? 线程死锁、 死循环， 饿死等。
+? 由于线程数量太多导致系统失败 （如无法创建线程等）
+
+处于TIMED_WAITING、WAINTING状态的线程一定不消耗CPU. 处于RUNNABLE的线
+程， 要结合当前线程代码的性质判断， 是否消耗CPU
+
+
+>> 线程堆栈可以分析哪些问题?? <<
+
+1.资源不足等导致的性能下降分析
+? 大量的线程停在同样的调用上下文上。
+? 资源数量配置太少 （如连接池连接配置过少等）， 而系统当前的压力比较大， 资源不足导致了某些线程不能及时获得资源而等待在那里(即挂起)。
+? 获得资源的线程把持资源时间太久， 导致资源不足
+? 设计不合理导致资源占用时间过久， 如SQL语句设计不恰当， 或者没有索引导致的数据库访问太慢等。
+? 资源用完后， 在某种异常情况下， 没有关闭或者回池， 导致可用资源泄漏或者减少， 从而导致资源竞争。
+
+2.线程不退出导致的系统挂死分析
+? 线程正在执行死循环的代码。
+? 资源不足或者资源泄漏， 造成当前线程阻塞在锁对象上 （即wait在锁对象上）， 长期得不到唤醒(notify)。
+? 如果当前程序和外部通信， 当外部程序挂起无返回时， 也会导致当前线程挂起。
+
+3.多个锁导致的锁链分析
+? 有的时候打印出的堆栈， 很多线程在等待不同的锁， 有的锁竞争可能是由于另一个锁对象竞争导致， 这时候要找到根源。
+
+4.通过线程堆栈进行性能瓶颈分析
+
+5.线程堆栈不能分析什么问题
+? 线程为什么跑飞的问题。
+? 并发的Bug导致的数据混乱,这种问题在线程堆栈中没有任何痕迹，所以这种问题线程堆栈无法提供任何帮助。
+? 数据库锁表的问题,表被锁，往往是由于某个事务没有提交/回滚，但这些信息无法在堆栈中表现出来，所以堆栈分析这类问题毫无帮助。
+? 其它。
+
+如果一个系统中如下特点，说明这个系统有性能提升的空间，换句话说，如果你的系统具有如下特点，说明你这个系统存在性能瓶颈
+? 随着系统逐步增加压力，但是CPU的使用率无法趋近于100%。
+? 持续运行缓慢。时常发现应用程序运行缓慢。通过改变环境因子(如负载量、数据库连接数等)也无法有效提升整体响应时间。
+? 系统性能随时间的增加逐渐下降。在负载稳定的情况下，系统运行时间越长速度越慢。可能是由于超出某个阈值范围，系统运行频繁出错从而导致系统死锁或崩溃。
+? 系统性能随负载的增加逐渐下降。随着用户数目的增多，应用程序的运行越发缓慢。若干个用户退出系统后，应用程序便能够恢复正常运行状态
+
+
+常见的性能瓶颈
+? 由于不恰当的同步导致的资源争用
+? sleep的滥用
+? String +的滥用。
+? 不恰当的线程模型
+? 效率低下的SQL语句或者不恰当的数据库设计 
+? 不恰当的GC参数设置导致的性能低下
+? 线程数量不足
+? 内存泄漏导致的频繁GC
+
+
+总的原则是在系统中算法已经足够简化，即从算法的角度无法提升性能时，当增加压力时，CPU上升，随着压力的增加，CPU的使用率能趋向于100%，
+此时说明系统的性能已经榨乾，性能调优即告结束.
+即系统满足了如下两个条件，那么性能调优即告结束：
+1. 算法足够优化
+2. 没有线程/资源的使用不当而导致的CPU利用不足。
+
+内存泄漏常发生于如下场景
+? 全局的容器类（如HashMap,或者自定义的容器类等），在对象不再需要时，忘记从容器中remove
+? 像Runnable对象等被java虚拟机自身管理的对象，没有正确的释放渠道。runnable对象必须交给一个Thread去run,否则该对象就永远不会消亡。
+
+
+垃圾收集算法一般要做2件基本的事情：
+1. 发现无用信息对象；
+2. 回收被无用对象占用的内存空间
+
+Java的根集对象包括哪些？
+? 没有被任何外部对象引用的栈中的对象，即系统内运行的所有线程分配在栈中的变量，该对象就是"根"，一旦线程跑到某一个变量所在的作用域之外，那么该变量
+就变成了垃圾，如果线程还在作用域内运行，那么该对象就是"根"；如果被其它对象引用，那么该对象不再是"根","根"变为它的上一级。
+? 静态变量.
+
+
+ 常见的内存泄漏代码有如下几种：
+? 全局变量（特别是容器类）引用了一个对象，在不需要的使用没有释放。 
+? 在异常情况下，由于释放代码没有被执行到导致的缓慢内存泄漏。这种只有在异常情况下才会导致内存泄漏
+? runnable类型的对象被new了，但是没有按照正常的逻辑提交给线程去执行。
+
+----------------------------------------------------------------------
+Shallow Size 
+对象自身占用的内存大小，不包括它引用的对象。 
+针对非数组类型的对象，它的大小就是对象与它所有的成员变量大小的总和。当然这里面还会包括一些java语言特性的数据存储单元。 
+针对数组类型的对象，它的大小是数组元素对象的大小总和。
+
+
+Retained Size 
+Retained Size=当前对象大小+当前对象可直接或间接引用到的对象的大小总和。(间接引用的含义：A->B->C, C就是间接引用) 
+换句话说，Retained Size就是当前对象被GC后，从Heap上总共能释放掉的内存。 
+不过，释放的时候还要排除被GC Roots直接或间接引用的对象。他们暂时不会被被当做Garbage。 
+---------------------------------------------------------------------
+gawk - pattern scanning and processing language
+grep  grep, egrep, fgrep - print lines matching a pattern
+uniq - report or omit repeated lines
+sort - sort lines of text files
+find - search for files in a directory hierarchy
+
+find . -maxdepth 1 -name "@*"
+
+用awk对一列数据求和
+cat near_log | sort | uniq -c | sort  -n -k 2 | head -50| awk '{a+=$1}END{print a}'
+
+awk -F: '{print NR,NF,$NF,"\t",$0}' /etc/passwd      //依次打印行号，字段数，最后字段值，制表符，每行内容
+awk -F'[:#]' '{print NF}'  helloworld.sh          //指定多个分隔符: #，输出每行多少字段
+
+-----------------------------------------------------------------------
+QPS：Queries Per Second意思是“每秒查询率”，是一台服务器每秒能够相应的查询次数，是对一个特定的查询服务器在规定时间内所处理流量多少的衡量标准。
+
+TPS: TransactionsPerSecond的缩写，也就是事务数/秒。它是软件测试结果的测量单位。一个事务是指一个客户机向服务器发送请求然后服务器 做出反应的过程。
+客户机在发送请求时开始计时，收到服务器响应后结束计时，以此来计算使用的时间和完成的事务个数，最终利用这些信息来估计得分。客户机使 用加权协函数平
+均方法来计算客户机的得分，测试软件就是利用客户机的这些信息使用加权协函数平均方法来计算服务器端的整体TPS得分。
+
+-----------------------------------------------------------------------
+消费者:
+./kafka-console-consumer.sh --zookeeper 10.1.15.29:2181 --topic ass_performance_string_log --from-beginning
+
+生产者:
+./kafka-console-producer.sh --broker-list 10.1.15.13:9092,10.1.15.14:9092,10.1.15.15:9092 --topic ass_performance_string_log
+查看topic分区信息:
+./kafka-topics.sh --describe --zookeeper 10.1.15.29:2181/kafka --topic ass_performance_byte_array_log
+
+-----------------------------------------------------------------------
+从文件内容查找匹配指定字符串的行：
+$ grep "被查找的字符串" 文件名
+例子：在当前目录里第一级文件夹中寻找包含指定字符串的.in文件
+grep "thermcontact" */*.in
+
+从文件内容查找与正则表达式匹配的行：
+$ grep –e “正则表达式” 文件名
+
+查找时不区分大小写：
+$ grep –i "被查找的字符串" 文件名
+
+查找匹配的行数：
+$ grep -c "被查找的字符串" 文件名
+
+
+从文件内容查找不匹配指定字符串的行：
+$ grep –v "被查找的字符串" 文件名
+
+
+从根目录开始查找所有扩展名为.log的文本文件，并找出包含”ERROR”的行
+find / -type f -name "*.log" | xargs grep "ERROR"
+例子：从当前目录开始查找所有扩展名为.in的文本文件，并找出包含”thermcontact”的行
+find . -name "*.in" | xargs grep "thermcontact"
+
+
+zcat压缩文件进行grep匹配的时候，如果不带上-a会遇到匹配到二进制文件 (标准输入)错误的情况
+因此匹配压缩文件zcat  |grep -a "这样的写法能够保证命令的正常执行"
+
+-------------------------------------------------
+PV,TPS,QPS理解:
+pv 是指页面被浏览的次数，比如你打开一网页，那么这个网站的pv就算加了一次；
+tps是每秒内的事务数，比如执行了dml操作，那么相应的tps会增加；
+qps是指每秒内查询次数，比如执行了select操作，相应的qps会增加。
+
+-------------------------------------------------
+netflix hystrix测试笔记
+
+每个CommandKey代表一个依赖抽象,相同的依赖要使用相同的CommandKey名称。依赖隔离的根本就是对相同CommandKey的依赖做隔离
+
+命令分组用于对依赖操作分组,便于统计,汇总等.CommandGroup是每个命令最少配置的必选参数，在不指定ThreadPoolKey的情况下，字面值用于对不同依赖的线程池/信号区分
+
+当对同一业务依赖做隔离时使用CommandGroup做区分,但是对同一依赖的不同远程调用如(一个是redis 一个是http),可以使用HystrixThreadPoolKey做隔离区分
+在业务上都是相同的组，但是需要在资源上做隔离时，可以使用HystrixThreadPoolKey区分.
+
+请求缓存可以让(CommandKey/CommandGroup)相同的情况下,直接共享结果，降低依赖调用次数，在高并发和CacheKey碰撞率高场景下可以提升性能
+
+隔离本地代码或可快速返回远程调用(如memcached,redis)可以直接使用信号量隔离,降低线程隔离开销。
+如果你对客户端库有足够的信任（延迟不会过高），并且你只需要控制系统负载，那么你可以使用信号量。
+##########
+1.CommandGroupKey相同,则使用同一线程池,如果CommandGroup相同,想使用独立线程池则需要添加ThreadPoolKey重新定义新线程池
+2.CommandKey相同的不同任务,hystrix当成一种任务处理,一个失败,后续不同任务都失败.
+3.CommandGroupKey相同,任务配置不同的线程数,以最先使用任务的线程数为准
+
+Reactive模式执行
+你也可以将 HystrixCommand 当作一个 Observable 来使用观察者模式获得结果，调用方式如下：
+
+observe() —— 返回一个 Hot Observable，这个命令将在调用 observe() 方法时被立即执行。你不用担心命令在返回 Observable 时被执行而无法观察/订阅到结果，
+因为这个 Observable 内部在每次有新的 Subscriber 订阅时会重放 Observable 的行为。
+
+toObservable() —— 返回一个 Cold Observable，调用完 toObservable() 方法之后命令不会立即被执行，直到有 Subscriber 订阅了这个 Observable。
+
+-----------------------------------------------------------
+1.依赖元素
+groupId,必选，实际隶属项目
+artifactId,必选，其中的模块
+version必选，版本号
+type可选，依赖类型，默认jar
+scope可选，依赖范围，默认compile
+optional可选，标记依赖是否可选，默认false
+exclusion可选，排除传递依赖性，默认空
+
+2.依赖范围
+maven项目又三种classpath（编译，测试，运行）
+
+scope用来表示与classpath的关系，总共有6种,默认为compile
+compile:编译，测试，运行
+test:测试
+provided:编译，测试
+runtime:运行
+system:编译，测试，同provided，但必须指定systemPath，慎用
+import scope 用在 dependency management 中，主要是用来导入另一个 pom 中 dependency management 里声明的依赖仲裁。 
+
+- compile: 默认的scope。编译、测试、打包全都需要。compile参与依赖传递，就是说，你的项目A依赖于B(依赖scope是compile)，项目C依赖于你的项目A，那么C也
+就依赖于B。
+
+- provided: 表示JDK或者容器会在Runtime时提供这些(jar)，如上面说到的servlet api。provided的东西在编译和测试时会用到，不参与传递依赖。
+
+- runtime: 表示编译时不需要，但测试和运行时需要，最终打包时会包含进去。
+
+- test: 只用于测试阶段（测试的编译和测试的运行），典型的就是junit的jar。
+
+- system: 和provided类似，但要求jar是你的系统里已有的，不会在repository里找，如rt.jar,tools.jar这些。
+
+- import: 简单的说，你的项目的pom可以继承另一个项目的pom，从而继承了父项目的依赖关系，但是因为之后single inheritance的限制，所以创造了import，使得你
+可以“导入”或者说“继承”任何一到多个项目的依赖关系。
+
+
+顶层 pom 中的 dependencies 与 dependencyManagement 中的 dependencies 元素有一个重要的区别：
+dependencyManagement 中的 dependencies 元素只表明依赖项版本的优先选择，并不影响项目的依赖项；而 dependencies 元素则影响项目的依赖项。
+
+
+-----------------------------------------------------------------
+maven2下载其源代码包并关联
+使maven2在下载依赖包的同时下载其源代码包的方法：
+1. 使用maven命令：mvn dependency:sources 下载依赖包的源代码。
+2. 使用参数： -DdownloadSources=true 下载源代码jar。 -DdownloadJavadocs=true 下载javadoc包。
+mvn dependency:sources -DdownloadSources=true -DdownloadJavadocs=true
+ 
+Eclipse
+mvn -DdownloadSources=true -DoutputDirectory=target/classes eclipse:eclipse
+ 
+-----------------------------------------------------------------
+spring boot
+spring help init  --spring-cli init相关参数列表
+
+
+-----------------------------------------------------------------
+Netty 4笔记:
+
+ByteBuf
+1）duplicate方法：复制当前对象，复制后的对象与前对象共享缓冲区，且维护自己的独立索引
+2）copy方法：复制一份全新的对象，内容和缓冲区都不是共享的
+3）slice方法：获取调用者的子缓冲区，且与原缓冲区共享缓冲区
+
+
+--------------------------------------------------------------
+
+性能测试的七种方法：
+1.基准测试
+基准测试是指通过设计科学的测试方法，测试工具和测试系统，实现对一类测试对象的某项指标进行定量的和可对比的测试。
+2.压力测试
+通过对软件系统不断施加压力，识别系统性能拐点，从而获得系统提供的最大服务界别的测试活动，主要目的是检查系统处于压力情况下应用的表现。
+3.负载测试
+通过在被测系统中不断增加压力，直到达到性能指标极限要求。主要目的是找到特定的环境下系统处理能力的极限。
+4.并发测试
+主要指当测试多用户并发访问同一个应用、模块、数据时是否产生隐藏的并发问题，如内存泄漏、线程锁、资源争用问题，几乎所有的性能测试都会涉及并发测试。主要
+目的并非是为了获得性能指标，而是为了发现并引起的问题。
+5.疲劳测试
+通过让软件在一定访问量情况下长时间运行，以检验系统性能在多长时间会出现明显下降，主要目的是验证系统运行的可靠性。
+6.数据量测试
+通过让软件在不同的数据量情况下运行，以检测系统性能在各种数据量情况下的表现。主要目的是找到支持系统正常工作的数据量权限。
+7.配置测试
+配置测试主要是针对硬件而言，了解各种不同环境对系统性能影响的程度，从而找到系统各项资源的最优分配原则。主要目的是了解各种不同因素对系统性能影响的程度，
+从而判断出最值得进行的调优操作。
+
+--------------------------------------------------------------
+
+MQ使用场景
+1.异步通信
+有些业务不想也不需要立即处理消息。消息队列提供了异步处理机制，允许用户把一个消息放入队列，但并不立即处理它。想向队列中放入多少消息就放多少，然后在
+需要的时候再去处理它们。
+
+2.解耦
+降低工程间的强依赖程度，针对异构系统进行适配。在项目启动之初来预测将来项目会碰到什么需求，是极其困难的。通过消息系统在处理过程中间插入了一个隐含的、
+基于数据的接口层，两边的处理过程都要实现这一接口，当应用发生变化时，可以独立的扩展或修改两边的处理过程，只要确保它们遵守同样的接口约束。
+
+3.冗余
+有些情况下，处理数据的过程会失败。除非数据被持久化，否则将造成丢失。消息队列把数据进行持久化直到它们已经被完全处理，通过这一方式规避了数据丢失风险。
+许多消息队列所采用的"插入-获取-删除"范式中，在把一个消息从队列中删除之前，需要你的处理系统明确的指出该消息已经被处理完毕，从而确保你的数据被安全的保
+存直到你使用完毕。
+
+4.扩展性
+因为消息队列解耦了你的处理过程，所以增大消息入队和处理的频率是很容易的，只要另外增加处理过程即可。不需要改变代码、不需要调节参数。便于分布式扩容。
+
+5.过载保护
+在访问量剧增的情况下，应用仍然需要继续发挥作用，但是这样的突发流量无法提取预知；如果以为了能处理这类瞬间峰值访问为标准来投入资源随时待命无疑是巨大的浪费。
+使用消息队列能够使关键组件顶住突发的访问压力，而不会因为突发的超负荷的请求而完全崩溃。
+
+6.可恢复性
+系统的一部分组件失效时，不会影响到整个系统。消息队列降低了进程间的耦合度，所以即使一个处理消息的进程挂掉，加入队列中的消息仍然可以在系统恢复后被处理。
+
+7.顺序保证
+在大多使用场景下，数据处理的顺序都很重要。大部分消息队列本来就是排序的，并且能保证数据会按照特定的顺序来处理。
+
+8.缓冲
+在任何重要的系统中，都会有需要不同的处理时间的元素。消息队列通过一个缓冲层来帮助任务最高效率的执行，该缓冲有助于控制和优化数据流经过系统的速度。
+以调节系统响应时间。
+
+9.数据流处理
+分布式系统产生的海量数据流，如：业务日志、监控数据、用户行为等，针对这些数据流进行实时或批量采集汇总，然后进行大数据分析是当前互联网的必备技术，
+通过消息队列完成此类数据收集是最好的选择。
+--------------------------------------------------------------
+rabbitMQ工作原理
+
+exchange： producer只能将消息发送给exchange。而exchange负责将消息发送到queues。Exchange必须准确的知道怎么处理它接受到的消息，是被发送到一个特定的
+queue还是许多quenes,还是被抛弃，这些规则则是通过exchange type来定义。主要的type有direct,topic,headers,fanout。具体针对不同的场景使用不同的type。
+
+queue: 消息队列，消息的载体。接收来自exchange的消息，然后再由consumer取出。exchange和queue是可以一对多的，它们通过routingKey来绑定。
+
+Producer:生产者，消息的来源,消息必须发送给exchange。而不是直接给queue
+
+Consumer:消费者，直接从queue中获取消息进行消费，而不是从exchange
+
+
+广播模型
+这里我们将自己定义一个exchange。并设置type为fanout。它可以将消息广播给绑定的每一个queue。而不再是某一个queue。我们在此创建一个叫logs的exchange
+
+direct模型
+这种路由方式exchange将消息通过绑定的routing_key发送到指定的队列。而且exchange可以通过多个routing_key把消息发送给同一个queue
+
+Topic模型
+相比较于direct的完全匹配和fanout的广播。Topic可以用类似正则的手法更好的匹配来满足我们的应用.发送消息的routing_key必须匹配上
+绑定到队列的routing_key。消息才会被发送。此外还有个重要的地方要说明，在如下代码处绑定的routing_key种可以有*和#2种字符
+*(星号) 可以匹配任意一个单词
+#(井号) 可以匹配0到多个单词
+
+RPC应用模型
+1.client发起请求，请求中带有2个参数reply_to和correlation_id
+2.请求发往rpc_queue
+3.server获取到rpc_queue中的消息，处理完毕后，将结果发往reply_to指定的callback queue
+4.client 获取到callback queue中的消息，匹配correlation_id,如果匹配就获取，不匹配就丢弃.
+
+
+几个重要概念：
+
+Broker：简单来说就是消息队列服务器实体。
+
+Exchange：消息交换机，它指定消息按什么规则，路由到哪个队列。
+
+Queue：消息队列载体，每个消息都会被投入到一个或多个队列。
+
+Binding：绑定，它的作用就是把exchange和queue按照路由规则绑定起来。
+
+Routing Key：路由关键字，exchange根据这个关键字进行消息投递。
+
+vhost：虚拟主机，一个broker里可以开设多个vhost，用作不同用户的权限分离。
+
+producer：消息生产者，就是投递消息的程序。
+
+consumer：消息消费者，就是接受消息的程序。
+
+channel：消息通道，在客户端的每个连接里，可建立多个channel，每个channel代表一个会话任务。
+
+消息队列的使用过程，如下：
+
+（1）客户端连接到消息队列服务器，打开一个channel。
+
+（2）客户端声明一个exchange，并设置相关属性。
+
+（3）客户端声明一个queue，并设置相关属性。
+
+（4）客户端使用routing key，在exchange和queue之间建立好绑定关系。
+
+（5）客户端投递消息到exchange。
+
+exchange接收到消息后，就根据消息的key和已经设置的binding，进行消息路由，将消息投递到一个或多个队列里。
+
+--------------------------------------------------------------
+
+Kafka相关概念
+
+Broker
+Kafka集群包含一个或多个服务器，这种服务器被称为broker[5]
+
+Topic
+每条发布到Kafka集群的消息都有一个类别，这个类别被称为Topic。（物理上不同Topic的消息分开存储，逻辑上一个Topic的消息虽然保存于一个或多个broker上但
+用户只需指定消息的Topic即可生产或消费数据而不必关心数据存于何处）
+
+Partition
+Parition是物理上的概念，每个Topic包含一个或多个Partition.
+
+Producer
+负责发布消息到Kafka broker
+
+Consumer
+消息消费者，向Kafka broker读取消息的客户端。
+
+Consumer Group
+每个Consumer属于一个特定的Consumer Group（可为每个Consumer指定group name，若不指定group name则属于默认的group）。
+
+--------------------------------------------------------------
+    MQ	    TPS量级(持久化)	      场景	                       			备注
+Rabbitmq	3500-4000msg/s	非海量高可靠性场景	            协议丰富兼容性强，功能完善，消息格式比较大，速度较慢，消息持久化对性能影响明显
+ZeroMq	    >800000msg/s	高并发连接场景，如：在线游戏	偏重于网络开发，开发成本高，高级功能需自行实现，不建议做传统MQ应用
+ActiveMq	~3600msg/s	    非海量高可靠场景				相对Rabbitmq较轻量级，性能相近，完整JMS支持、配置较复杂
+Redis	    ~15000msg/s	    高吞吐低延迟				    轻量级MQ的快速简单实现，容灾与负载等功能需自行完善
+Kafka	Input ~70000msg/s	日志等海量数据流				非典型MQ，更偏重于流式数据批处理
+
+--------------------------------------------------------------
+TCP 半连接队列和全连接队列
+cat /proc/sys/net/ipv4/tcp_abort_on_overflow
+tcp_abort_on_overflow 为0表示如果三次握手第三步的时候全连接队列满了那么server扔掉client 发过来的ack（在server端认为连接还没建立起来）
+把tcp_abort_on_overflow修改成 1，1表示第三步的时候如果全连接队列满了，server发送一个reset包给client，表示废掉这个握手过程和这个连接（本来在server端这个
+连接就还没建立起来）。
+
+>netstat -s | egrep "listen|LISTEN"
+667399 times the listen queue of a socket overflowed
+667399 SYNs to LISTEN sockets ignored
+
+>ss -lnt
+Recv-Q Send-Q Local Address:Port  Peer Address:Port 
+0        50               *:3306             *:* 
+上面看到的第二列Send-Q 表示第三列的listen端口上的全连接队列最大为50，第一列Recv-Q为全连接队列当前使用了多少
+
+--------------------------------------------------------------
+netstat命令各个参数说明如下：
+　　-t : 指明显示TCP端口
+　　-u : 指明显示UDP端口
+　　-l : 仅显示监听套接字(所谓套接字就是使应用程序能够读写与收发通讯协议(protocol)与资料的程序)
+　　-p : 显示进程标识符和程序名称，每一个套接字/端口都属于一个程序。
+　　-n : 不进行DNS轮询，显示IP(可以加速操作)
+
+netstat -ntlp   //查看当前所有tcp端口·
+netstat -ntulp |grep 80   //查看所有80端口使用情况·
+
+lsof -i:端口号
+lsof -i:端口号，用于查看某一端口的占用情况，比如查看22号端口使用情况，lsof -i:22
+--------------------------------------------------------------
+
